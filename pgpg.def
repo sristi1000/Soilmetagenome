@@ -1,0 +1,89 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%labels
+    Maintainer Beginner_Bioinformatics
+    Description Simple Ubuntu-based container for PGPg_finder
+
+%environment
+    export PATH=/opt/PGPg_finder:/opt/diamond:/opt/megahit/bin:/opt/conda/bin:$PATH
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Step 1: Update Ubuntu, add universe (needed for megahit/bbmap/etc.), enable multiverse if needed
+    apt-get update
+    apt-get install -y software-properties-common
+    add-apt-repository -y universe
+    apt-get update
+
+    # Step 2: Install everything available directly via apt
+    apt-get install -y \
+        wget \
+        git \
+        bzip2 \
+        ca-certificates \
+        build-essential \
+        cmake \
+        zlib1g-dev \
+        gawk \
+        python3 \
+        python3-pip \
+        python3-numpy \
+        python3-scipy \
+        python3-pandas \
+        python3-matplotlib \
+        python3-seaborn \
+        trimmomatic \
+        samtools \
+        bowtie2 \
+        bbmap \
+        prodigal
+
+    # NOTE: apt's versions of these will differ from your original pinned
+    # versions (python=3.7.12, pandas=1.3.5, numpy=1.21.6, etc). If
+    # PGPg_finder breaks on newer versions, pin via pip instead, e.g.:
+    #   pip3 install numpy==1.21.6 pandas==1.3.5 scipy==1.7.3 matplotlib==3.3.2 seaborn==0.12.2
+
+    # Step 3: DIAMOND - apt's version won't match 2.0.14, so grab the exact
+    # release binary instead
+    mkdir -p /opt/diamond
+    cd /opt/diamond
+    wget https://github.com/bbuchfink/diamond/releases/download/v2.0.14/diamond-linux64.tar.gz
+    tar xzf diamond-linux64.tar.gz
+    rm diamond-linux64.tar.gz
+
+    # Step 3b: MEGAHIT - not packaged for Ubuntu 20.04's apt repos, so use
+    # the precompiled release binary instead (pinned to 1.2.9)
+    cd /opt
+    wget https://github.com/voutcn/megahit/releases/download/v1.2.9/MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
+    tar xzf MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
+    mv MEGAHIT-1.2.9-Linux-x86_64-static megahit
+    rm MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
+
+    # Step 4: PEAR - not available via apt (license restriction), and building
+    # it from source off GitHub mirrors is unreliable: even bioconda's own
+    # recipe has to apply a patch (0001-skip-unused-asm-code.patch) to get
+    # it to compile cleanly. Rather than reproduce that patch by hand, pull
+    # the already-fixed build from bioconda via a minimal conda install.
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+    bash /tmp/miniconda.sh -b -p /opt/conda
+    rm /tmp/miniconda.sh
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+    /opt/conda/bin/conda install -y -c bioconda -c conda-forge pear=0.9.6
+    /opt/conda/bin/conda clean -a -y
+
+    # Step 5: Download PGPg_finder tool from GitHub and make it executable
+    cd /opt
+    git clone https://github.com/tpellegrinetti/PGPg_finder.git
+    chmod +x /opt/PGPg_finder/PGPg_finder.py
+
+    # Step 6: Clean up
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    exec python3 /opt/PGPg_finder/PGPg_finder.py "$@"
