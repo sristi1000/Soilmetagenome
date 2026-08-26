@@ -58,6 +58,63 @@ cat Natural_03.proteins.faa Natural_04.proteins.faa > all_Natural_proteins.faa
 
 /home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i all_samples_genes.fna -o nr_gene_catalog.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 2
 
+## Build the non redundant catalog ##
+
+/home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i all_samples_genes.fna -o nr_gene_catalog.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 2
+
+
+/usr/bin/time -v /home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i Chemical_03.genes.fna -o 03_sample_nr/Chemical_03.nr.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 3 > logs/Chemical_03.cdhit.log 2>&1
+
+/home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i Natural_03.genes.fna -o 03_sample_nr/Natural_03.nr.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 3
+
+
+
+
+## Create the matching protein FASTA for EACH sample ##
+
+# Extract gene id
+grep '^>' Chemical_03.nr.fna | sed 's/^>//' | awk '{print $1}' > Chemical_03.nr.ids
+grep '^>' Natural_03.nr.fna | sed 's/^>//' | awk '{print $1}' > Natural_03.nr.ids
+# Correspond protein and id
+seqkit grep -f Chemical_03.nr.ids ../Chemical_03.proteins.faa -o Chemical_03.nr.faa
+
+
+
+
+/usr/bin/time -v /home/gsbtmjrf/TOOLS/eggnog-mapper-2.1.15.sif emapper.py -i /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --itype proteins -m diamond --data_dir /home/gsbtmjrf/TOOLS/eggnog_v5_DB --cpu 1 --block_size 1 --index_chunks 4 --temp_dir /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/eggnog/tmp --output_dir /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/eggnog -o Chemical_03 > Samplewise-Chemical_03_nr-annotation.log 2>&1
+
+
+
+#
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 2 --tmpdir tmp/
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond blastp --db /home/gsbtmjrf/TOOLS/mgPGPT/metagenome --query /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --out /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/PGPg/Chemical_03_PGP.tsv --outfmt 6 qseqid sseqid pident length qcovhsp evalue bitscore --threads 1 --block-size 1 --index-chunks 4 --evalue 1e-5 --sensitive
+
+
+
+### Data bases ###
+
+
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog_proteins.dmnd
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db.fieldpresence.bin
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db.taxids.bin
+wget https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.taxa.db
+
+
+
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 1
+
+
+
+
+#
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 2 --tmpdir tmp/
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond blastp --db /home/gsbtmjrf/TOOLS/mgPGPT/metagenome --query /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --out /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/PGPg/Chemical_03_PGP.tsv --outfmt 6 qseqid sseqid pident length qcovhsp evalue bitscore --threads 1 --block-size 1 --index-chunks 4 --evalue 1e-5 --sensitive
+
+
 
 
 ############################################################################################################################################
