@@ -1,0 +1,380 @@
+
+singularity exec \
+  --bind /path/to/CheckM2_database:/database_dir \
+  --env CHECKM2DB=/database_dir/CheckM2_database/uniref100.KO.1.dmnd \
+  checkm2_latest.sif \
+  checkm2 predict --threads 8 --input /path/to/your/bins_folder --output-directory /path/to/output_folder
+  
+  
+## FINAL ##
+
+singularity exec --bind /home/gsbtmjrf/TOOLS/CheckM2_database:/database_dir /home/gsbtmjrf/TOOLS/checkm2_latest.sif checkm2 predict --threads 1 --input /home/gsbtmjrf/Pranav/Analysis/Year_1/O1816141_WGM_Supplementary/Supp.file1_Denovo_Assembled_fasta/new -x fa --database_path /home/gsbtmjrf/TOOLS/CheckM2_database/uniref100.KO.1.dmnd --output-directory /home/gsbtmjrf/New-study/01_Completeness-Contamination_Checkm2/new
+  
+  
+## Prodigal ##
+  
+prodigal \
+    -i 00_raw_data/assemblies/SAMPLE_1.fasta \
+    -p meta \
+    -f gff \
+    -o 01_prodigal/SAMPLE_1.gff \
+    -a 01_prodigal/SAMPLE_1.proteins.faa \
+    -d 01_prodigal/SAMPLE_1.genes.fna
+    
+    
+## Pyrodigal ##
+
+pyrodigal \
+    -i SAMPLE_1.fasta \
+    -p meta \
+    -f gff \
+    -o SAMPLE_1.gff \
+    -a SAMPLE_1.proteins.faa \
+    -d SAMPLE_1.genes.fna
+    
+
+/home/gsbtmjrf/TOOLS/pyrodigal_3.7.1--py312h247cb63_1.sif pyrodigal -i /home/gsbtmjrf/Pranav/Analysis/Year_1/O1816141_WGM_Supplementary/Supp.file1_Denovo_Assembled_fasta/Chemical_03_final.contigs.fa -p meta -f gff -o Chemical_03_final.contigs.gff -a Chemical_03_final.contigs.proteins.faa -d Chemical_03_final.contigs_orf.fna
+
+/usr/bin/time -v /home/gsbtmjrf/TOOLS/pyrodigal_3.7.1--py312h247cb63_1.sif pyrodigal -i /home/gsbtmjrf/Pranav/Analysis/Year_1/O1816141_WGM_Supplementary/Supp.file1_Denovo_Assembled_fasta/Chemical_04_final.contigs.fa -p meta -f gff -o Chemical_04_final.contigs.gff -a Chemical_04_final.contigs.proteins.faa -d Chemical_04_final.contigs_orf.fna
+
+
+## Combination of genes ##
+
+sed -E 's/^>([^[:space:]]+)/>Chemical_01|\1/' Chemical_03_final.contigs.orf.fna > Chemical_03.genes.fna
+
+sed -E 's/^>([^[:space:]]+)/>Chemical_01|\1/' Chemical_03_final.contigs.proteins.faa > Chemical_03.proteins.faa
+
+sed -E 's/^>([^[:space:]]+)/>Natural_03|\1/' Natural_03_final.contigs.orf.fna > Natural_03.genes.fna
+
+sed -E 's/^>([^[:space:]]+)/>Natural_03|\1/' Natural_03_final.contigs.proteins.faa > Natural_03.proteins.faa
+
+-> cat Chemical_03.genes.fna Chemical_04.genes.fna > all_Chemical_genes.fna
+-> cat Chemical_03.proteins.faa Chemical_04.proteins.faa > all_Chemical_proteins.faa
+
+-> cat Natural_03.genes.fna Natural_04.genes.fna > all_Natural_genes.fna
+-> cat Natural_03.proteins.faa Natural_04.proteins.faa > all_Natural_proteins.faa
+
+## Build the non redundant catalog ##
+
+/home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i all_samples_genes.fna -o nr_gene_catalog.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 2
+
+
+/usr/bin/time -v /home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i Chemical_03.genes.fna -o 03_sample_nr/Chemical_03.nr.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 3 > logs/Chemical_03.cdhit.log 2>&1
+
+/home/gsbtmjrf/TOOLS/cdhit-reader_0.5.0--pyhdfd78af_0.sif cd-hit-est -i Natural_03.genes.fna -o 03_sample_nr/Natural_03.nr.fna -c 0.95 -n 8 -aS 0.90 -aL 0.90 -g 1 -d 0 -M 6000 -T 3
+
+
+
+
+## Create the matching protein FASTA for EACH sample ##
+
+# Extract gene id
+grep '^>' Chemical_03.nr.fna | sed 's/^>//' | awk '{print $1}' > Chemical_03.nr.ids
+grep '^>' Natural_03.nr.fna | sed 's/^>//' | awk '{print $1}' > Natural_03.nr.ids
+# Correspond protein and id
+seqkit grep -f Chemical_03.nr.ids ../Chemical_03.proteins.faa -o Chemical_03.nr.faa
+seqkit grep -f Natural_03.nr.ids ../Natural_03.proteins.faa -o Natural_03.nr.faa
+
+
+
+/usr/bin/time -v /home/gsbtmjrf/TOOLS/eggnog-mapper-2.1.15.sif emapper.py -i /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --itype proteins -m diamond --data_dir /home/gsbtmjrf/TOOLS/eggnog_v5_DB --cpu 1 --block_size 1 --index_chunks 4 --temp_dir /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/eggnog/tmp --output_dir /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/eggnog -o Chemical_03 > Samplewise-Chemical_03_nr-annotation.log 2>&1
+
+
+
+#
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 2 --tmpdir tmp/
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond blastp --db /home/gsbtmjrf/TOOLS/mgPGPT/metagenome --query /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --out /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/PGPg/Chemical_03_PGP.tsv --outfmt 6 qseqid sseqid pident length qcovhsp evalue bitscore --threads 1 --block-size 1 --index-chunks 4 --evalue 1e-5 --sensitive
+
+
+
+### Data bases ###
+
+
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog_proteins.dmnd
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db.fieldpresence.bin
+wget -c https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.db.taxids.bin
+wget https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/eggnog.taxa.db
+
+
+
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 1
+
+
+
+
+#
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond makedb --in mgPGPT-db_Feb2022_ul_dwnld.fasta.gz --db metagenome --threads 2 --tmpdir tmp/
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond blastp --db /home/gsbtmjrf/TOOLS/mgPGPT/metagenome --query /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --out /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/PGPg/Chemical_03_PGP.tsv --outfmt 6 qseqid sseqid pident length qcovhsp evalue bitscore --threads 1 --block-size 1 --index-chunks 4 --evalue 1e-5 --sensitive
+
+
+/usr/bin/time -v ../diamond_2.2.5--he361c42_0.sif diamond blastp --db /home/gsbtmjrf/TOOLS/mgPGPT/metagenome --query /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/Chemical_03.nr.faa --out /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/05_annotation/PGPg/Chemical_03_PGP.tsv --outfmt 6 qseqid sseqid pident length qcovhsp evalue bitscore --threads 2 --block-size 0.5 --index-chunks 8 --fast
+
+
+# Get best hit from pgp tsv
+# Criteria
+
+The best hit is chosen by:
+
+-- Highest bit score (primary criterion)
+
+-- Lowest E-value (already correlated with the highest score)
+
+-- Highest coverage if scores are tied. #
+
+sort -k1,1 -k7,7gr Chemical_03_PGP.tsv | awk '!seen[$1]++' > Chemical_03_PGP_besthit.tsv
+
+# Create lookup tale of pgp DB
+zgrep '^>' mgPGPT-db_Feb2022_ul_dwnld.fasta.gz > mgPGPT_headers.txt
+
+
+/usr/bin/time -v singularity exec --bind /home/gsbtmjrf/TOOLS/mgPGPT:/opt/PGPg_finder/database ../PGPg_finder-1.1.sif PGPg_finder.py -w genome_wf -i /home/gsbtmjrf/New-study/01_Pyrodigal/02_combined_genes/03_sample_nr/subsample -o N4/ -t 2 --extra "--block-size 0.4 --index-chunks 8 --sensitive"
+
+
+
+
+
+
+
+
+
+
+
+# seqkit grep -f Chemical_03_PGPT.ids /home/gsbtmjrf/TOOLS/mgPGPT/mgPGPT-db_Feb2022_ul_dwnld.fasta.gz -o Chemical_03_PGPT_reference.faa -j 1T_reference.faa
+
+
+
+
+
+############################################################################################################################################
+##----------------------------------------------------------------------------------------------------------------------------------------##
+https://github.com/sristi1000/Soilmetagenome/blob/main/Command-map
+
+
+# COMPARE #
+
+                YOUR CURRENT POSITION
+                        │
+                        ▼
+                  Pyrodigal outputs
+                        │
+           ┌────────────┴────────────┐
+           ▼                         ▼
+      EACH SAMPLE              EACH SAMPLE
+       genes.fna                proteins.faa
+           │                         │
+           ▼                         ▼
+     sample NR catalog        eggNOG + dbCAN
+           │                         │
+           └────────────┬────────────┘
+                        ▼
+                sample functional
+                     profile
+                        │
+          ┌─────────────┴─────────────┐
+          ▼                           ▼
+ Individual sample comparison    Combined matrix
+   Chemical_03 vs Natural_03      all samples
+          │                           │
+          └─────────────┬─────────────┘
+                        ▼
+                 Chemical vs Natural
+                        │
+                        ▼
+                Statistical analysis
+
+
+SEPARATE GENE-LEVEL BRANCH:
+
+sample NR genes
+       ↓
+combine all NR genes
+       ↓
+cross-sample NR catalog
+       ↓
+Bowtie2 + CoverM
+       ↓
+gene abundance matrix
+
+
+
+---------------------------------------------
+
+MEGAHIT ASSEMBLED CONTIGS
+            │
+            ▼
+        Pyrodigal
+            │
+      ┌─────┴─────┐
+      ▼           ▼
+   genes.fna   proteins.faa
+      │           │
+      └─────┬─────┘
+            ▼
+      CD-HIT-EST
+            │
+            ▼
+   NON-REDUNDANT GENE
+       CATALOG
+      │        │
+      │        ▼
+      │   NR proteins.faa
+      │        │
+      │        ▼
+      │   eggNOG-mapper
+      │    v2.1.15
+      │        │
+      │   ┌────┼─────┐
+      │   ▼    ▼     ▼
+      │ KEGG eggNOG GO/EC
+      │
+      │
+RAW R1/R2 READS
+      │
+      ▼
+    Bowtie2
+      │
+      ▼
+     BAM
+      │
+      ▼
+    CoverM
+      │
+      ▼
+GENE ABUNDANCE MATRIX
+      │
+      ├──────────────┐
+      ▼              ▼
+  Annotation       dbCAN
+      │              │
+      └──────┬───────┘
+             ▼
+     FUNCTIONAL MATRICES
+       ┌─────┼─────┐
+       ▼     ▼     ▼
+     KEGG  eggNOG CAZy
+       │     │     │
+       └─────┼─────┘
+             ▼
+   ORGANIC vs CHEMICAL
+      COMPARATIVE
+       ANALYSIS
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  
+--------------------------------------------------------------------------------------------------------------------------------------------
+  
+  
+                         SOIL WGS
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+          RAW READS                   ASSEMBLY
+              │                           │
+              │                       FASTA/contigs
+              │                           │
+      ┌───────┴───────┐             ┌─────┴─────────┐
+      │               │             │               │
+   TAXONOMY       ABUNDANCE     GENE PREDICTION   BINNING
+      │               │             │               │
+      │               │             │              MAGs
+      │               │             │               │
+ Alpha diversity   Beta diversity   FUNCTION     CheckM2
+ Richness          Bray-Curtis      KEGG          GTDB-Tk
+ Shannon           PCoA             eggNOG        MAG abundance
+ Simpson                           CAZy
+                                    │
+                         ┌──────────┼───────────┐
+                         │          │           │
+                       PGP       Nutrient     AMR
+                       genes     cycling       genes
+                         │          │           │
+                         └──────────┼───────────┘
+                                    │
+                              SAMPLE 1 vs 2
+                                    │
+                         TAXONOMIC + FUNCTIONAL
+                               COMPARISON
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+S1 FASTA ──────────────┐
+                       │
+S2 FASTA ──────────────┤
+                       ↓
+                  Prodigal
+                       ↓
+               Protein + CDS
+                       ↓
+                 MMseqs2 NR
+                       ↓
+               ┌───────┴────────┐
+               ↓                ↓
+        eggNOG-mapper       DIAMOND
+               ↓                ↓
+        KEGG/COG/GO       PGP target genes
+               │                │
+               └───────┬────────┘
+                       ↓
+                  Gene catalogue
+                       ↑
+                       │
+                 FASTQ mapping
+                       │
+                       ↓
+              Normalized abundance
+                       │
+        ┌──────────────┼──────────────┐
+        ↓              ↓              ↓
+   TAXONOMIC       FUNCTIONAL       PGP
+   DIVERSITY       DIVERSITY      POTENTIAL
+        │              │              │
+        ↓              ↓              ↓
+   Richness         KO richness     nif
+   Shannon          Shannon         acdS
+   Bray-Curtis      KEGG            gcd/pqq
+   PCoA             COG             IAA
+                                      │
+                                      ↓
+                              N/C/P/S cycling
+                                      │
+                                      ↓
+                              Sample 1 vs 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
