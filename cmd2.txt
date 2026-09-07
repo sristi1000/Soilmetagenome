@@ -147,6 +147,12 @@ zgrep '^>' mgPGPT-db_Feb2022_ul_dwnld.fasta.gz > mgPGPT_headers.txt
 
 
 
+----------------------------
+New
+----------------------------
+/usr/bin/time -v singularity exec eggnog-mapper-3.0.0-beta6.sif emapper.py -i /home/jagat/New-study/06_Non-redundant-geneset/Natural_03.nr.faa --itype proteins -m diamond --data_dir /home/jagat/TOOLS/eggnog_v5_DB --cpu 6 --temp_dir /home/jagat/New-study/tmp --output_dir /home/jagat/New-study/07_eggnog_anno -o Natural_03 > Samplewise-Natural_03_nr-annotation.log 2>&1
+
+
 
 
 ############################################################################################################################################
